@@ -25,6 +25,10 @@ class CIFARDataset(Dataset):
         return len(self.data)
 
 
+train_transforms = T.Compose([T.ToTensor(), T.RandomHorizontalFlip(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+val_transforms = T.Compose([T.ToTensor(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+
 def get_cifar_data_loader(client_name, batch_size, split):
     dataset_file = os.path.join(data_home, '{}_dataset.npz'.format(client_name))
     dataset = np.load(dataset_file, allow_pickle=True)
@@ -42,16 +46,8 @@ def get_cifar_data_loader(client_name, batch_size, split):
     test_data = data[n_train:]
     test_labels = labels[n_train:]
 
-    # mu = np.mean(train_data)
-    # std = np.std(train_data)
-    # train_data = (train_data - mu) / std
-    # test_data = (test_data - mu) / std
-
-    transform = T.Compose([T.ToTensor(), T.RandomHorizontalFlip(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    train_dataset = CIFARDataset(data=train_data, labels=train_labels,
-                                 transform=transform)
-    test_dataset = CIFARDataset(data=test_data, labels=test_labels,
-                                transform=transform)
+    train_dataset = CIFARDataset(data=train_data, labels=train_labels, transform=train_transforms)
+    test_dataset = CIFARDataset(data=test_data, labels=test_labels, transform=val_transforms)
 
     if split:
         train_data_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
@@ -90,8 +86,25 @@ def get_data_for_sampling(client_names):
     return ret
 
 
-def get_data_loader_by_samples(data, labels, batch_size=4):
+def new_data_loader(data, labels, batch_size=4):
     data = data.reshape((-1, 3, 32, 32)).transpose(0, 2, 3, 1)
-    transform = T.Compose([T.ToTensor(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    dateset = CIFARDataset(data, labels, transform)
+    dateset = CIFARDataset(data, labels, val_transforms)
     return DataLoader(dataset=dateset, batch_size=batch_size, shuffle=False, num_workers=4)
+
+
+def get_sample_data_loaders():
+    samples_data = np.load(os.path.join(settings.DATA_HOME['cifar10'], 'samples.npz'), allow_pickle=True)
+    sampling_types = samples_data['sampling_types']
+    client_list = samples_data['client_names']
+
+    samples_data_loaders = {}
+    for sampling_type in sampling_types:
+        samples_data_loaders[sampling_type] = []
+        for client_idx in range(client_list.shape[0]):
+            data = samples_data[sampling_type][client_idx]
+            data = data.reshape((-1, 3, 32, 32)).transpose((0, 2, 3, 1))
+            labels = samples_data['ground_truth'][client_idx]
+            data_loader = new_data_loader(data, labels)
+            samples_data_loaders[sampling_type].append(data_loader)
+
+    return client_list, sampling_types, samples_data_loaders

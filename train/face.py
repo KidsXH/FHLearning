@@ -44,7 +44,7 @@ def local_predict():
     client_names, sampling_types, samples_data_loaders = get_sample_data_loaders()
 
     for client_idx, client_name in enumerate(client_names):
-        checkpoint_path = os.path.join(settings.CHECKPOINTS_DIR, client_name, '{}_Local_last.cp'.format(client_name))
+        checkpoint_path = os.path.join(settings.CHECKPOINTS_DIR, client_name, '{}_Local_best.cp'.format(client_name))
         model = FaceModel().to(device)
         model.load_state_dict(torch.load(checkpoint_path))
         results = {}

@@ -170,17 +170,17 @@ def get_data_by_client(client_name):
         images.append(image.numpy() * 255)
         labels.append(label)
     return np.array(images, np.uint8), np.array(labels, np.long)
-
-
-def create_dataset():
-    images_0, labels_0 = get_data_by_client('Client-0')
-    images_0 = images_0.reshape(images_0.shape[0], -1)
-    images_1, labels_1 = get_data_by_client('Client-1')
-    images_1 = images_1.reshape(images_1.shape[0], -1)
-    np.savez_compressed(os.path.join(settings.DATA_HOME['face'], 'face_dataset'),
-                        data=[images_0, images_1],
-                        labels=[labels_0, labels_1],
-                        client_names=['Client-0', 'Client-1'])
+#
+#
+# def create_dataset():
+#     images_0, labels_0 = get_data_by_client('Client-0')
+#     images_0 = images_0.reshape(images_0.shape[0], -1)
+#     images_1, labels_1 = get_data_by_client('Client-1')
+#     images_1 = images_1.reshape(images_1.shape[0], -1)
+#     np.savez_compressed(os.path.join(settings.DATA_HOME['face'], 'face_dataset'),
+#                         data=[images_0, images_1],
+#                         labels=[labels_0, labels_1],
+#                         client_names=['Client-0', 'Client-1'])
 
 
 def get_data_for_sampling(client_names):
