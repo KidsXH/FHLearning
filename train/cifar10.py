@@ -15,6 +15,8 @@ SEED = 0
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 np.random.seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+torch.backends.cudnn.deterministic = True
 
 
 HISTORY_DIR = os.path.join(BASE_DIR, 'data', 'history', 'cifar10')
@@ -180,4 +182,4 @@ if __name__ == '__main__':
     # local_predict()
     # client_names = ['Client-{}'.format(i) for i in range(10)]
     # client_names = ['Client-0', 'Client-2', 'Client-7']
-    federated_learning(communication_rounds=10, epochs_per_round=1, saving=True, n_sampling_parameters=1000)
+    federated_learning(communication_rounds=100, epochs_per_round=1, saving=True, n_sampling_parameters=1000)
