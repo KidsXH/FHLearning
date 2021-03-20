@@ -88,6 +88,8 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
     for client_name in client_list:
         cosines[client_name] = []
 
+    total_accuracy_list = [[] for _ in client_list]
+
     last_time = time()
     # Start federated learning
     for i in range(communication_rounds):
@@ -140,7 +142,8 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
                                 correct += (predicted == labels).sum().item()
                     results[sampling_type] = np.concatenate(predictions)
                     if sampling_type == 'local':
-                        print('Local Acc:', correct / total)
+                        print('    Total Acc:', correct / total)
+                        total_accuracy_list[client_id].append(correct / total)
 
                 output_file = os.path.join(settings.OUTPUTS_DIR, '{}_Server_r{}'.format(client_name, i))
                 np.savez_compressed(output_file, **results)
@@ -153,7 +156,8 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
 
     loss_list = [client.history['loss'] for client in federated_clients if client.name in client_list]
     val_acc_list = [client.history['val_acc'] for client in federated_clients if client.name in client_list]
-    np.savez_compressed(settings.VAL_FILE, client_names=client_names, loss=loss_list, val_acc=val_acc_list)
+    np.savez_compressed(settings.VAL_FILE, client_names=client_names, loss=loss_list, val_acc=val_acc_list,
+                        tot_acc=total_accuracy_list)
 
     cosines_file = os.path.join(settings.WEIGHTS_DIR, 'cosines')
     np.savez_compressed(cosines_file, **cosines)
