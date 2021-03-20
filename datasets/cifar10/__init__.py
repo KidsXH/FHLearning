@@ -102,7 +102,6 @@ def get_sample_data_loaders():
         samples_data_loaders[sampling_type] = []
         for client_idx in range(client_list.shape[0]):
             data = samples_data[sampling_type][client_idx]
-            data = data.reshape((-1, 3, 32, 32)).transpose((0, 2, 3, 1))
             labels = samples_data['ground_truth'][client_idx]
             data_loader = new_data_loader(data, labels)
             samples_data_loaders[sampling_type].append(data_loader)
