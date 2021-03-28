@@ -43,10 +43,12 @@ def local_learning(client_list, n_epochs):
                                     device=device))
 
     for client in local_clients:
-        print('Training:', client.name)
+        last_time = time()
         for epoch in range(n_epochs):
+            print('Training:', client.name)
             client.run(n_epochs=1, save_last=True)
             client.test(save_best=True)
+            print('Time:', time() - last_time)
 
 
 def local_predict():
@@ -182,15 +184,6 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
 
 if __name__ == '__main__':
     print('Running on device:', device)
-    # local_learning(client_list=['Client-0', 'Client-1'], n_epochs=100)
+    # local_learning(client_list=['Client-0', 'Client-1'], n_epochs=200)
     # local_predict()
-    federated_learning(communication_rounds=3, epochs_per_round=1, saving=True, n_sampling_parameters=1000)
-
-    # local_learning(client_names=['Client-0', 'Client-1'], n_epochs=50)
-    # local_predict(client_names=['Client-0', 'Client-1'], sampling_types=['local', 'stratified'])
-    # np.random.seed(0)
-    # saved_paras_idx = np.random.permutation(23714)[:1000]
-    # data = np.load(os.path.join(settings.DATA_HOME['face'], 'samples.npz'), allow_pickle=True)
-    # federated_learning(client_names=['Client-0', 'Client-1'], communication_rounds=50, epochs_per_round=1,
-    #                    samples_data=data, sampling_types=['local', 'stratified'], saving=True,
-    #                    saved_paras_idx=saved_paras_idx)
+    federated_learning(communication_rounds=200, epochs_per_round=1, saving=True, n_sampling_parameters=1000)

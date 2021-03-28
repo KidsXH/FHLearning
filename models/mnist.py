@@ -27,7 +27,7 @@ class Client(ClientBase):
         self.model = MnistModel().to(device)
         # self.criterion = FocalLoss(2)
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.002, momentum=0.9)
         self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.995, last_epoch=start_epoch - 1)
         self.best_acc = best_acc
 

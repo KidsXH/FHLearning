@@ -36,8 +36,8 @@ def pca_figure(data, labels):
 
 
 if __name__ == '__main__':
-    clients = ['Client-{}'.format(i) for i in range(10)]
-    sampling_dataset('cifar10', clients)
+    # clients = ['Client-{}'.format(i) for i in range(4)]
+    sampling_dataset('cifar10', ['Client-0', 'Client-3'])
     f = np.load(os.path.join(settings.DATA_HOME['cifar10'], 'samples.npz'), allow_pickle=True)
 
     # samples_data = np.load(os.path.join(settings.DATA_HOME['face'], 'samples.npz'))

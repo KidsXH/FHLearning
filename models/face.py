@@ -1,19 +1,8 @@
 import torch
 from torch import nn
 
-import torch.nn.functional as F
-from torch.nn.functional import relu, softmax
-from torchvision.models.resnet import BasicBlock, ResNet
-
 from models.csBase import ClientBase, ServerBase
 
-
-# class FaceModel(ResNet):
-#     """
-#     Resnet18
-#     """
-#     def __init__(self):
-#         super(FaceModel, self).__init__(BasicBlock, [2, 2, 2, 2], num_classes=2)
 
 class FaceModel(nn.Module):
     def __init__(self):

@@ -4,7 +4,7 @@ from time import time
 import numpy as np
 import torch
 
-import settings
+from settings import BASE_DIR
 from datasets.mnist import get_mnist_data_loaders, get_sample_data_loaders
 from models.mnist import Client, MnistModel, Server
 from utils import parameters2weights, cos_v
@@ -17,6 +17,14 @@ torch.cuda.manual_seed(SEED)
 np.random.seed(SEED)
 
 
+HISTORY_DIR = os.path.join(BASE_DIR, 'data', 'history', 'mnist')
+
+CHECKPOINTS_DIR = os.path.join(HISTORY_DIR, 'checkpoints')
+WEIGHTS_DIR = os.path.join(HISTORY_DIR, 'weights')
+OUTPUTS_DIR = os.path.join(HISTORY_DIR, 'outputs')
+VAL_FILE = os.path.join(HISTORY_DIR, 'validation.npz')
+
+
 def local_learning(client_list, n_epochs):
     client_names, train_loaders, test_loaders = get_mnist_data_loaders(batch_size=batch_size)
 
@@ -26,7 +34,7 @@ def local_learning(client_list, n_epochs):
         if client_name in client_list:
             local_clients.append(Client(client_name=client_name + '_Local',
                                         train_loader=train_loader, test_loader=test_loader,
-                                        checkpoint_path=os.path.join(settings.CHECKPOINTS_DIR, client_name),
+                                        checkpoint_path=os.path.join(CHECKPOINTS_DIR, client_name),
                                         device=device))
 
     print('n_paras: {}'.format(sum(p.numel() for p in local_clients[0].model.parameters())))
@@ -42,7 +50,7 @@ def local_predict():
     client_names, sampling_types, samples_data_loaders = get_sample_data_loaders()
 
     for client_idx, client_name in enumerate(client_names):
-        checkpoint_path = os.path.join(settings.CHECKPOINTS_DIR, client_name, '{}_Local_best.cp'.format(client_name))
+        checkpoint_path = os.path.join(CHECKPOINTS_DIR, client_name, '{}_Local_best.cp'.format(client_name))
         model = MnistModel().to(device)
         model.load_state_dict(torch.load(checkpoint_path))
         results = {}
@@ -58,7 +66,7 @@ def local_predict():
                     _, predicted = torch.max(outputs.data, 1)
                     predictions.append(predicted.cpu().numpy())
             results[sampling_type] = np.concatenate(predictions)
-        output_file = os.path.join(settings.OUTPUTS_DIR, '{}_local'.format(client_name))
+        output_file = os.path.join(OUTPUTS_DIR, '{}_local'.format(client_name))
         np.savez_compressed(output_file, **results)
 
 
@@ -67,7 +75,7 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
     client_list, sampling_types, samples_data_loaders = get_sample_data_loaders()
 
     # Initiate Parameters
-    server = Server(start_round=0, checkpoint_path=os.path.join(settings.CHECKPOINTS_DIR, 'Server'), device=device)
+    server = Server(start_round=0, checkpoint_path=os.path.join(CHECKPOINTS_DIR, 'Server'), device=device)
 
     n_paras = sum(p.numel() for p in server.model.parameters())
     print('n_paras: {}'.format(n_paras))
@@ -82,7 +90,7 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
                                         device=device))
 
     weights_0 = parameters2weights(server.model.parameters())
-    weights_0_file = os.path.join(settings.WEIGHTS_DIR, 'weights_0')
+    weights_0_file = os.path.join(WEIGHTS_DIR, 'weights_0')
     np.savez_compressed(weights_0_file, weights_0=weights_0[sampling_idx])
     cosines = {}
     for client_name in client_list:
@@ -114,7 +122,7 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
 
         if saving:
             server_weights = parameters2weights(server.model.parameters())
-            weights_file = os.path.join(settings.WEIGHTS_DIR, 'Server_r{}'.format(i))
+            weights_file = os.path.join(WEIGHTS_DIR, 'Server_r{}'.format(i))
             np.savez_compressed(weights_file, server_weights=server_weights[sampling_idx])
 
             for client_id, client_name in enumerate(client_list):
@@ -145,21 +153,21 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
                         print('    Total Acc:', correct / total)
                         total_accuracy_list[client_id].append(correct / total)
 
-                output_file = os.path.join(settings.OUTPUTS_DIR, '{}_Server_r{}'.format(client_name, i))
+                output_file = os.path.join(OUTPUTS_DIR, '{}_Server_r{}'.format(client_name, i))
                 np.savez_compressed(output_file, **results)
 
                 client_weights = parameters2weights(client.model.parameters())
-                weights_file = os.path.join(settings.WEIGHTS_DIR, '{}_r{}'.format(client_name, i))
+                weights_file = os.path.join(WEIGHTS_DIR, '{}_r{}'.format(client_name, i))
                 np.savez_compressed(weights_file, client_weights=client_weights[sampling_idx])
 
                 cosines[client_name].append(cos_v(client_weights - w0, server_weights - w0))
 
     loss_list = [client.history['loss'] for client in federated_clients if client.name in client_list]
     val_acc_list = [client.history['val_acc'] for client in federated_clients if client.name in client_list]
-    np.savez_compressed(settings.VAL_FILE, client_names=client_names, loss=loss_list, val_acc=val_acc_list,
+    np.savez_compressed(VAL_FILE, client_names=client_names, loss=loss_list, val_acc=val_acc_list,
                         tot_acc=total_accuracy_list)
 
-    cosines_file = os.path.join(settings.WEIGHTS_DIR, 'cosines')
+    cosines_file = os.path.join(WEIGHTS_DIR, 'cosines')
     np.savez_compressed(cosines_file, **cosines)
 
 

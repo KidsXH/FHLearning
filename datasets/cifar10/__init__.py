@@ -26,7 +26,9 @@ class CIFARDataset(Dataset):
 
 
 train_transforms = T.Compose([T.ToTensor(),
+                              T.Pad(4, padding_mode='reflect'),
                               T.RandomHorizontalFlip(),
+                              T.RandomCrop(32),
                               T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 val_transforms = T.Compose([T.ToTensor(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
