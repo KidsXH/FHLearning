@@ -146,3 +146,11 @@ def sample_n_idx(n, max_n):
         return np.random.permutation(n)[:max_n]
     else:
         return np.arange(0, n, 1)
+
+
+def set_random_seed(SEED=0):
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    np.random.seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+    torch.backends.cudnn.deterministic = True

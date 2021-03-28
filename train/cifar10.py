@@ -12,7 +12,6 @@ from utils import get_sample_idx, sample_weights, update_cosines
 batch_size = 4
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
 HISTORY_DIR = os.path.join(BASE_DIR, 'data', 'history', 'cifar10')
 
 CHECKPOINTS_DIR = os.path.join(HISTORY_DIR, 'checkpoints')
@@ -68,7 +67,8 @@ def local_predict():
         np.savez_compressed(output_file, **results)
 
 
-def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False, max_num_parameters=1000):
+def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
+                       sampling_idx_layers=None, sampling_idx_all=None):
     client_list, sampling_types, samples_data_loaders = get_sample_data_loaders()
     client_names = np.array(['Client-{}'.format(i) for i in range(4)])
     train_loaders = []
@@ -88,8 +88,6 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
     n_layers = len(layer_names)
     info_file = os.path.join(HISTORY_DIR, 'model_info')
     np.savez_compressed(info_file, layer_names=layer_names)
-
-    sampling_idx_layers, sampling_idx_all = get_sample_idx(server.model, max_num_parameters)
 
     federated_clients = []
 
