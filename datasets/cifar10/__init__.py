@@ -25,22 +25,19 @@ class CIFARDataset(Dataset):
         return len(self.data)
 
 
-train_transforms = T.Compose([T.ToTensor(), T.RandomHorizontalFlip(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+train_transforms = T.Compose([T.ToTensor(),
+                              T.RandomHorizontalFlip(),
+                              T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 val_transforms = T.Compose([T.ToTensor(), T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 
-def get_cifar_data_loader(client_name, batch_size, split):
+def get_cifar_data_loader(client_name, batch_size):
     dataset_file = os.path.join(data_home, '{}_dataset.npz'.format(client_name))
     dataset = np.load(dataset_file, allow_pickle=True)
     data = dataset['data']
     labels = dataset['labels']
 
-    random_state = np.random.get_state()
-    data = np.random.permutation(data)
-    np.random.set_state(random_state)
-    labels = np.random.permutation(labels)
-
-    n_train = int(data.shape[0] * 0.9)
+    n_train = 5000
     train_data = data[:n_train]
     train_labels = labels[:n_train]
     test_data = data[n_train:]
@@ -49,14 +46,9 @@ def get_cifar_data_loader(client_name, batch_size, split):
     train_dataset = CIFARDataset(data=train_data, labels=train_labels, transform=train_transforms)
     test_dataset = CIFARDataset(data=test_data, labels=test_labels, transform=val_transforms)
 
-    if split:
-        train_data_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-        test_data_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-        return train_data_loader, test_data_loader
-    else:
-        data_loader = DataLoader(dataset=ConcatDataset([train_dataset, test_dataset]),
-                                 batch_size=batch_size, shuffle=False, num_workers=4)
-        return data_loader
+    train_data_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    test_data_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    return train_data_loader, test_data_loader
 
 
 def get_data_by_client(client_name):
@@ -77,11 +69,11 @@ def get_data_for_sampling(client_names):
         all_labels.append(labels)
     ret = {'client_names': np.array(client_names),
            'data_shape': [3, 32, 32],
-           'label_names': ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'],
+           'label_names': ['plane', 'car', 'ship', 'truck'],
            'data': np.array(all_data),
            'labels': np.array(all_labels),
-           'train_size': [5400] * len(client_names),
-           'test_size': [600] * len(client_names),
+           'train_size': [4500] * len(client_names),
+           'test_size': [900] * len(client_names),
            }
     return ret
 

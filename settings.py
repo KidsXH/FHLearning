@@ -10,10 +10,3 @@ DATA_HOME = {
     'cifar10': os.path.join(BASE_DIR, 'data', 'cifar10'),
 }
 
-
-HISTORY_DIR = os.path.join(BASE_DIR, 'data', 'history', 'mnist')
-
-CHECKPOINTS_DIR = os.path.join(HISTORY_DIR, 'checkpoints')
-WEIGHTS_DIR = os.path.join(HISTORY_DIR, 'weights')
-OUTPUTS_DIR = os.path.join(HISTORY_DIR, 'outputs')
-VAL_FILE = os.path.join(HISTORY_DIR, 'validation.npz')

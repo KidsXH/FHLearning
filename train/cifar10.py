@@ -6,17 +6,11 @@ import torch
 
 from settings import BASE_DIR
 from datasets.cifar10 import get_cifar_data_loader, get_sample_data_loaders
-from models.cifar10 import Client, CIFARModel, Server
-from utils import parameters2weights, cos_v
+from models.cifar10 import CIFARModel, Client, Server
+from utils import get_sample_idx, sample_weights, update_cosines
 
 batch_size = 4
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-SEED = 0
-torch.manual_seed(SEED)
-torch.cuda.manual_seed(SEED)
-np.random.seed(SEED)
-torch.cuda.manual_seed_all(SEED)
-torch.backends.cudnn.deterministic = True
 
 
 HISTORY_DIR = os.path.join(BASE_DIR, 'data', 'history', 'cifar10')
@@ -31,7 +25,7 @@ def local_learning(client_list, n_epochs):
     train_loaders = []
     test_loaders = []
     for client_name in client_list:
-        train_loader, test_loader = get_cifar_data_loader(client_name, batch_size=batch_size, split=True)
+        train_loader, test_loader = get_cifar_data_loader(client_name, batch_size=batch_size)
         train_loaders.append(train_loader)
         test_loaders.append(test_loader)
 
@@ -55,7 +49,7 @@ def local_predict():
     client_names, sampling_types, samples_data_loaders = get_sample_data_loaders()
 
     for client_idx, client_name in enumerate(client_names):
-        checkpoint_path = os.path.join(CHECKPOINTS_DIR, client_name, '{}_Local_best.cp'.format(client_name))
+        checkpoint_path = os.path.join(CHECKPOINTS_DIR, client_name, '{}_Local_last.cp'.format(client_name))
         model = CIFARModel().to(device)
         model.load_state_dict(torch.load(checkpoint_path))
         results = {}
@@ -74,13 +68,13 @@ def local_predict():
         np.savez_compressed(output_file, **results)
 
 
-def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False, n_sampling_parameters=1000):
+def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False, max_num_parameters=1000):
     client_list, sampling_types, samples_data_loaders = get_sample_data_loaders()
-    client_names = np.array(['Client-{}'.format(i) for i in range(10)])
+    client_names = np.array(['Client-{}'.format(i) for i in range(4)])
     train_loaders = []
     test_loaders = []
     for client_name in client_names:
-        train_loader, test_loader = get_cifar_data_loader(client_name, batch_size=batch_size, split=True)
+        train_loader, test_loader = get_cifar_data_loader(client_name, batch_size=batch_size)
         train_loaders.append(train_loader)
         test_loaders.append(test_loader)
 
@@ -88,23 +82,30 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
     server = Server(start_round=0, checkpoint_path=os.path.join(CHECKPOINTS_DIR, 'Server'), device=device)
 
     n_paras = sum(p.numel() for p in server.model.parameters())
-    print('n_paras: {}'.format(n_paras))
+    print('Total n_paras: {}'.format(n_paras))
 
-    np.random.seed(0)
-    sampling_idx = np.random.permutation(n_paras)[:n_sampling_parameters]
+    layer_names = server.model.layer_names
+    n_layers = len(layer_names)
+    info_file = os.path.join(HISTORY_DIR, 'model_info')
+    np.savez_compressed(info_file, layer_names=layer_names)
+
+    sampling_idx_layers, sampling_idx_all = get_sample_idx(server.model, max_num_parameters)
 
     federated_clients = []
 
     for client_name, train_loader, test_loader in zip(client_names, train_loaders, test_loaders):
-        federated_clients.append(Client(client_name=client_name, train_loader=train_loader, test_loader=test_loader,
-                                        device=device))
+        federated_clients.append(Client(client_name=client_name,
+                                        checkpoint_path=os.path.join(CHECKPOINTS_DIR, client_name),
+                                        train_loader=train_loader, test_loader=test_loader, device=device))
 
-    weights_0 = parameters2weights(server.model.parameters())
-    weights_0_file = os.path.join(WEIGHTS_DIR, 'weights_0')
-    np.savez_compressed(weights_0_file, weights_0=weights_0[sampling_idx])
+    weights0_layers, weights0_all = sample_weights(server.model, sampling_idx_layers, sampling_idx_all)
+    weights0_file = os.path.join(WEIGHTS_DIR, 'weights_0')
+    np.savez_compressed(weights0_file, layers=weights0_layers, all=weights0_all)
+    torch.save(server.model.state_dict(), os.path.join(CHECKPOINTS_DIR, 'model_0.cp'))
+
     cosines = {}
     for client_name in client_list:
-        cosines[client_name] = []
+        cosines[client_name] = [[] for _ in range(n_layers + 1)]
 
     total_accuracy_list = [[] for _ in client_list]
 
@@ -114,26 +115,25 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
         print('Communication Round {} | Time: {}'.format(i, time() - last_time))
         last_time = time()
 
+        pre_model = CIFARModel().cuda()
+        pre_model.load_state_dict(server.model.state_dict())
+
         global_parameters = server.get_parameters()
         local_parameters = []
-        w0 = parameters2weights(server.model.parameters())
         # Federated Learning
         for client in federated_clients:
             client.set_parameters(global_parameters)
-            client.run(n_epochs=epochs_per_round)
+            client.run(n_epochs=epochs_per_round, save_last=True)
             local_parameters.append(client.get_parameters())
 
         server.aggregate(local_parameters)
-
-        # Test
-        for client in federated_clients:
-            if client.name in client_list:
-                client.test()
+        server.save(suffix='_r{}'.format(i))
 
         if saving:
-            server_weights = parameters2weights(server.model.parameters())
+            server_weights_layers, server_weights_all = sample_weights(server.model,
+                                                                       sampling_idx_layers, sampling_idx_all)
             weights_file = os.path.join(WEIGHTS_DIR, 'Server_r{}'.format(i))
-            np.savez_compressed(weights_file, server_weights=server_weights[sampling_idx])
+            np.savez_compressed(weights_file, layers=server_weights_layers, all=server_weights_all)
 
             for client_id, client_name in enumerate(client_list):
                 client = federated_clients[np.where(client_names == client_name)[0][0]]
@@ -165,11 +165,19 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
                 output_file = os.path.join(OUTPUTS_DIR, '{}_Server_r{}'.format(client_name, i))
                 np.savez_compressed(output_file, **results)
 
-                client_weights = parameters2weights(client.model.parameters())
-                weights_file = os.path.join(WEIGHTS_DIR, '{}_r{}'.format(client_name, i))
-                np.savez_compressed(weights_file, client_weights=client_weights[sampling_idx])
+                client_weights_layers, client_weights_all = sample_weights(client.model,
+                                                                           sampling_idx_layers, sampling_idx_all)
 
-                cosines[client_name].append(cos_v(client_weights - w0, server_weights - w0))
+                weights_file = os.path.join(WEIGHTS_DIR, '{}_r{}'.format(client_name, i))
+                np.savez_compressed(weights_file, layers=client_weights_layers, all=client_weights_all)
+
+                update_cosines(pre_model, client.model, server.model, cosines[client_name])
+
+        # Test
+        for client in federated_clients:
+            if client.name in client_list:
+                client.set_parameters(server.get_parameters())
+                client.test()
 
     loss_list = [client.history['loss'] for client in federated_clients if client.name in client_list]
     val_acc_list = [client.history['val_acc'] for client in federated_clients if client.name in client_list]
@@ -178,12 +186,3 @@ def federated_learning(communication_rounds=1, epochs_per_round=1, saving=False,
 
     cosines_file = os.path.join(WEIGHTS_DIR, 'cosines')
     np.savez_compressed(cosines_file, **cosines)
-
-
-if __name__ == '__main__':
-    print('Running on device:', device)
-    # local_learning(client_list=['Client-2', 'Client-7'], n_epochs=60)
-    # local_predict()
-    # client_names = ['Client-{}'.format(i) for i in range(10)]
-    # client_names = ['Client-0', 'Client-2', 'Client-7']
-    federated_learning(communication_rounds=100, epochs_per_round=1, saving=True, n_sampling_parameters=1000)

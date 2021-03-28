@@ -8,20 +8,33 @@ from models.csBase import ClientBase, ServerBase
 class CIFARModel(nn.Module):
     def __init__(self):
         super(CIFARModel, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 6, 5),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(6, 16, 5),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+        )
+        self.fc1 = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(16 * 5 * 5, 120),
+            nn.ReLU(),
+        )
+        self.fc2 = nn.Sequential(
+            nn.Linear(120, 84),
+            nn.ReLU(),
+        )
         self.fc3 = nn.Linear(84, 10)
 
+        self.layers = [self.conv1, self.conv2, self.fc1, self.fc2, self.fc3]
+        self.layer_names = ['Conv1', 'Conv2', 'FC1', 'FC2', 'FC3']
+
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        for layer in self.layers:
+            x = layer(x)
         return x
 
 
@@ -34,7 +47,7 @@ class Client(ClientBase):
         # self.criterion = FocalLoss(2)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.995, last_epoch=start_epoch - 1)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.992, last_epoch=start_epoch - 1)
         self.best_acc = best_acc
 
     def run(self, n_epochs, save_last=False):
